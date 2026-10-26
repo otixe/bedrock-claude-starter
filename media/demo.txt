@@ -1,0 +1,5 @@
+$ python examples/offline_tool_loop.py
+tool schema : {'type': 'object', 'properties': {'order_id': {'type': 'string'}}, 'required': ['order_id']}
+tool calls  : [('get_order', {'order_id': 'A-1001'})]
+iterations  : 2 | stop_reason: end_turn
+answer      : Order A-1001 is on its way. Tool said: {'order_id': 'A-1001', 'status': 'shipped', 'eta_days': 2}

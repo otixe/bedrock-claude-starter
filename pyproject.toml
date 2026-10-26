@@ -7,8 +7,9 @@ name = "bedrock-claude-starter"
 version = "0.1.0"
 description = "Production-ready boilerplate for Claude agents on AWS Bedrock with semantic memory"
 readme = "README.md"
-license = { file = "LICENSE" }
-authors = [{ name = "Otixe Cifuentes", email = "https://github.com/otixe" }]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Otixe Cifuentes" }]
 keywords = [
     "claude", "bedrock", "aws", "agent", "llm",
     "qdrant", "semantic-memory", "tool-use", "agentic",

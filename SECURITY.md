@@ -2,8 +2,9 @@
 
 ## Reporting a vulnerability
 
-If you discover a security issue, **do not open a public GitHub issue**. Email:
-📧 **https://github.com/otixe** with subject `[SECURITY]`. Response within 72h.
+Please use [Report a vulnerability](https://github.com/otixe/bedrock-claude-starter/security/advisories/new) (GitHub Security Advisories).
+Do not post tokens, credentials, private configuration or personal data in public issues.
+If private reporting is not enabled, request that the maintainer enables it without disclosing vulnerability details.
 
 ## What this starter does NOT store
 

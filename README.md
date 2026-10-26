@@ -1,213 +1,111 @@
-# bedrock-claude-starter
+<p align="center">
+  <img src="media/banner.svg" alt="bedrock-claude-starter — A small, typed Claude agent on Amazon Bedrock: tool loop plus semantic memory." width="100%">
+</p>
 
-<div align="center">
+<p align="center">
+  <a href="https://github.com/otixe/bedrock-claude-starter/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/otixe/bedrock-claude-starter/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-65d8ba?style=flat-square&labelColor=102127"></a>
+  <img alt="python: 3.10+" src="https://img.shields.io/badge/python-3.10%2B-65d8ba?style=flat-square&labelColor=102127">
+  <img alt="amazon: Bedrock" src="https://img.shields.io/badge/amazon-Bedrock-65d8ba?style=flat-square&labelColor=102127">
+  <img alt="memory: Qdrant" src="https://img.shields.io/badge/memory-Qdrant-65d8ba?style=flat-square&labelColor=102127">
+</p>
 
-🧠 **Production-ready boilerplate for Claude agents on AWS Bedrock**
+**A deliberately small starter for a Claude agent on Amazon Bedrock** — about a thousand lines you can read in an afternoon: a retrying Converse client, a decorator-based tool loop, optional semantic memory and typed messages.
 
-*Tool-use loop · semantic memory · structured I/O · ready to clone*
+## The problem
 
-[![CI](https://github.com/otixe/bedrock-claude-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/otixe/bedrock-claude-starter/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+Most "Claude agent" examples are chat loops without the parts a real agent needs on day two: retries, tool plumbing that does not hand-write JSON schemas, a bounded loop, and memory that survives the conversation. Frameworks add those, along with a lot you did not ask for.
 
-</div>
+## The approach
 
----
+Four pieces, each in its own small module, and nothing else:
 
-## Why?
+```mermaid
+flowchart LR
+  U[User message] --> A[Agent loop]
+  A <-->|"Converse API<br/>retries + backoff"| B[(Amazon Bedrock<br/>Claude)]
+  A <-->|"@tool functions<br/>schema from type hints"| F[Your Python code]
+  A <-->|"recall / remember"| M[("Memory<br/>Qdrant + Titan v2 embeddings")]
+  A --> R[AgentResponse<br/>text · tool calls · stop reason]
+```
 
-Most "Claude agent" tutorials are toy chat loops with no production concerns:
-no retries, no memory, no observability, no real tool plumbing.
+1. **`BedrockClient`** — wraps `bedrock-runtime`'s Converse API; three attempts with exponential backoff; optional extended-thinking request field.
+2. **`@tool`** — turns a typed Python function into a tool definition (JSON schema derived from the signature) and invokes it with the model's arguments.
+3. **`Agent`** — runs the loop: send messages and tool specs, execute `toolUse` blocks, append results, repeat until a final answer or `max_iterations` (default 10).
+4. **`Memory`** — stores exchanges in Qdrant (in-memory, on-disk or remote) with Titan Text Embeddings v2 (1024 dimensions) and recalls the top-k most similar into the system prompt.
 
-This is a **deliberately small** starter that ships with the four things every
-real agent eventually needs:
+## See it run
 
-1. **Robust Bedrock client** — retries, exponential backoff, `thinking` mode toggle
-2. **Tool-use loop** — register Python functions, get them called by Claude with structured args
-3. **Semantic memory** — persist exchanges in Qdrant, retrieve by embedding similarity
-4. **Structured I/O** — Pydantic-typed messages and results (no dict-stringly-typed hellscapes)
+The demo swaps Bedrock for a scripted stand-in with the same response shape, so you can watch the loop call a tool and use its result — no AWS account needed.
 
-Clone it, replace the example tools and system prompt, and you have a working agent
-in 30 minutes.
+<p align="center">
+  <img src="media/demo.svg" alt="Terminal capture of examples/offline_tool_loop.py: the agent calls get_order and answers in two iterations." width="92%">
+</p>
 
----
-
-## Features
-
-- 🤖 **Bedrock-native** — uses `bedrock-runtime` Converse API (the modern, model-agnostic one)
-- 🔁 **Tool loop** — auto-iterates between Claude and your Python functions until task complete
-- 🧠 **Semantic memory** — Qdrant + Titan v2 embeddings (1024 dims), in-memory or remote
-- 💬 **Conversation history** — sliding window with semantic retrieval of older context
-- 🎯 **Typed messages** — Pydantic models for messages, tool defs, memory entries
-- 🛡️ **Safety nets** — max iterations, timeout, IAM-scoped tools
-- 🧪 **Test suite** — full mocked Bedrock + Qdrant for fast offline tests
-- 🪶 **Lightweight** — no LangChain, no LlamaIndex, no framework lock-in
-
----
+<sub>Terminal capture of examples/offline_tool_loop.py: the agent calls get_order and answers in two iterations.</sub>
 
 ## Quickstart
 
+Python 3.10+. Not on PyPI yet:
+
 ```bash
-pip install bedrock-claude-starter
+pip install "git+https://github.com/otixe/bedrock-claude-starter.git"
+```
 
-# Configure AWS credentials (SSO recommended)
-export AWS_PROFILE=my-bedrock-profile
-export AWS_REGION=us-east-1
+Against real Bedrock you need AWS credentials with `bedrock:InvokeModel` access to a Claude model enabled in your account and region:
 
-# Spin up local Qdrant in Docker
-docker run -d -p 6333:6333 --name qdrant qdrant/qdrant
-
-# Run the demo agent
-agent chat
+```bash
+export AWS_PROFILE=my-bedrock-profile AWS_REGION=us-east-1
+agent chat                       # interactive demo CLI
 ```
 
 ```python
 from bedrock_claude_starter import Agent, tool
 
-
-@tool(description="Get the current weather for a city.")
-def get_weather(city: str) -> str:
-    """In real life, call your weather API. Here, a stub."""
-    return f"It's 22°C and sunny in {city}."
-
+@tool(description="Look up an order by its ID.")
+def get_order(order_id: str) -> dict:
+    return {"order_id": order_id, "status": "shipped"}
 
 agent = Agent(
-    system_prompt="You are a helpful assistant. Use tools when needed.",
-    tools=[get_weather],
-    model="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    system_prompt="You are a support assistant. Use tools when needed.",
+    tools=[get_order],
 )
-
-response = agent.run("What's the weather in Santiago?")
-print(response.text)
+print(agent.run("Where is order A-1001?").text)
 ```
 
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Agent                               │
-│                                                             │
-│  ┌─────────────┐   ┌─────────────────┐   ┌──────────────┐   │
-│  │ Bedrock     │◄─►│  Tool-use Loop  │◄─►│  Memory      │   │
-│  │ Client      │   │  (Converse API) │   │  (Qdrant)    │   │
-│  │ (boto3)     │   │                 │   │              │   │
-│  └──────┬──────┘   └────────┬────────┘   └──────┬───────┘   │
-│         │                   │                   │           │
-└─────────┼───────────────────┼───────────────────┼───────────┘
-          │                   │                   │
-          ▼                   ▼                   ▼
-   ┌─────────────┐    ┌─────────────┐     ┌──────────────┐
-   │  Bedrock    │    │  Your Python│     │   Qdrant     │
-   │  (Claude    │    │  functions  │     │   (vector    │
-   │  models)    │    │  as @tool   │     │   DB)        │
-   └─────────────┘    └─────────────┘     └──────────────┘
-```
-
-The agent runs a loop:
-
-1. Send messages + tool definitions to Bedrock
-2. Receive response — either text or tool-use blocks
-3. If tool-use: invoke the registered Python function, append result to messages
-4. If text: return it (or store in memory and return)
-5. Repeat until terminal response or `max_iterations` reached
-
-Memory is queried before each turn — relevant past exchanges are injected
-as context.
-
----
-
-## Tools API
-
-Define tools with the `@tool` decorator. Type hints generate the schema:
+Add memory (needs Bedrock for embeddings; Qdrant runs in-process by default, or point it at a server):
 
 ```python
-from bedrock_claude_starter import tool
+from bedrock_claude_starter import Agent, Memory
 
-@tool(description="Look up a customer by ID.")
-def get_customer(customer_id: str) -> dict:
-    return db.fetch(customer_id)
-
-@tool(description="Create a support ticket.")
-def create_ticket(title: str, body: str, priority: str = "medium") -> str:
-    """Returns the new ticket ID."""
-    return tickets.create(title, body, priority).id
+memory = Memory()                              # in-memory Qdrant
+# Memory(qdrant_path="./qdrant") for disk, Memory(qdrant_url="http://localhost:6333") for a server
+agent = Agent(memory=memory, memory_top_k=5)
 ```
 
-Pydantic models also work for richer schemas:
+## Design notes
 
-```python
-from pydantic import BaseModel
+- **Offline-testable.** `Agent` accepts any object with a `converse()` method through `bedrock_client=`, which is how the tests and the demo run without the cloud.
+- **Bounded.** The loop stops at `max_iterations` and returns a `max_iterations` stop reason rather than spinning.
+- **Typed.** Messages, tool definitions, memory entries and responses are Pydantic models.
+- **No framework.** No LangChain, no LlamaIndex; read the source instead of the docs.
 
-class TicketSpec(BaseModel):
-    title: str
-    body: str
-    priority: Literal["low", "medium", "high"]
+## Scope and limits
 
-@tool(description="Create a support ticket from a structured spec.")
-def create_ticket(spec: TicketSpec) -> str:
-    return tickets.create(**spec.model_dump()).id
-```
+A starter, not a platform: one conversation per `Agent`, memory is "remember the exchange, recall by similarity", and the `thinking` flag passes a `reasoning_config` request field that only some models accept. Tool authorisation, multi-agent coordination and shared team memory are out of scope — that is what the Otixe platform is for.
 
----
+## Part of the Otixe agent platform
 
-## Semantic memory
+Otixe builds persistent, accountable agent teams: **Pi** (runtime) → **Oficinas** (persistent teams) ↔ **Cerebro** (shared memory and work state) ↔ **Sinapsis** (web control surface), with **AMA** connecting the runtime to Cerebro.
 
-```python
-from bedrock_claude_starter import Memory
+A minimal reference for the agent loop (tools + memory) that the runtime layer generalises. The platform itself runs on Pi; this starter is independent of it.
 
-memory = Memory(
-    collection_name="customer-support",
-    qdrant_url="http://localhost:6333",
-    embedding_model="amazon.titan-embed-text-v2:0",
-)
+[Otixe profile](https://github.com/otixe) · [Platform manual](https://github.com/otixe/plataforma) · [pi-oficinas](https://github.com/otixe/pi-oficinas)
 
-memory.remember("Customer X prefers email over phone.")
-memory.remember("Refund threshold for tier-2 customers is $500.")
+## Validation
 
-# Retrieve by similarity
-results = memory.recall("How should I contact customer X?", limit=3)
-```
-
-Pass it to the agent:
-
-```python
-agent = Agent(
-    system_prompt="You are a support agent.",
-    tools=[get_customer, create_ticket],
-    memory=memory,
-    memory_top_k=5,
-)
-```
-
-The agent auto-injects the top-K relevant memory entries into the system context
-before each turn.
-
----
-
-## What this starter is NOT
-
-- ❌ A full agent framework (use LangChain or LlamaIndex if you want a kitchen sink)
-- ❌ A multi-agent orchestrator (single-agent, single-conversation only)
-- ❌ A web app (no UI, no HTTP server — bring your own)
-- ❌ Locked to one Claude version (works with any Bedrock-hosted Claude)
-
-The goal is to be **boilerplate** — clone it, hack it, ship it. Read the source.
-
----
-
-## Examples
-
-- [`examples/customer-support-agent.md`](examples/customer-support-agent.md) — multi-tool agent with memory
-- [`examples/research-agent.md`](examples/research-agent.md) — long-running research with web tools
-- [`examples/structured-output.md`](examples/structured-output.md) — get JSON-typed results out of Claude
-
----
+See [VALIDATION.md](VALIDATION.md) for the local Python matrix, reproducible checks and unproven integration boundaries. GitHub Actions has not been run by this delivery.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-Built by [@otixe](https://github.com/otixe) — DevOps & Agentic Systems Engineer · 🇨🇱
