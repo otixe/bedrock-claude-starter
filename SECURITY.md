@@ -75,3 +75,5 @@ Avoid storing:
 
 Pre-commit hooks (`detect-secrets`, `detect-private-key`, `detect-aws-credentials`)
 gate this. Run `pre-commit install` after cloning.
+
+If you cannot use GitHub Security Advisories, email **otixecv@gmail.com** with the subject `SECURITY: bedrock-claude-starter`. Please do not open a public issue for vulnerabilities.
